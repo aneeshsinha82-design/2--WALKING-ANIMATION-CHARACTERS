@@ -1,219 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Character Height Comparison Generator</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; display: flex; height: 100vh; overflow: hidden; }
-    #sidebar { width: 380px; background: #1e1e1e; border-right: 1px solid #333; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-    h2, h3 { color: #4CAF50; border-bottom: 1px solid #333; padding-bottom: 5px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 13px; color: #aaa; }
-    input[type="text"], input[type="number"] { background: #2a2a2a; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; font-size: 14px; }
-    input[type="file"] { font-size: 12px; color: #aaa; }
-    .card { background: #252525; padding: 12px; border-radius: 6px; border: 1px solid #3a3a3a; display: flex; flex-direction: column; gap: 8px; }
-    button { background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-    button:hover { background: #45a049; }
-    button.btn-danger { background: #e53935; }
-    button.btn-danger:hover { background: #d32f2f; }
-    #main-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0a0a0a; padding: 20px; position: relative; }
-    #canvas-container { position: relative; border: 2px solid #333; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-    canvas { display: block; background: #000; }
-    .controls { margin-top: 15px; display: flex; gap: 15px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Height Comparison Generator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#121212;color:#fff;display:flex;height:100vh;overflow:hidden}#sidebar{width:380px;background:#1e1e1e;border-right:1px solid #333;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:15px}h2,h3{color:#4CAF50;border-bottom:1px solid #333;padding-bottom:5px}.form-group{display:flex;flex-direction:column;gap:6px}label{font-size:13px;color:#aaa}input[type=text],input[type=number]{background:#2a2a2a;border:1px solid #444;color:#fff;padding:8px;border-radius:4px;font-size:14px}input[type=file]{font-size:12px;color:#aaa}.card{background:#252525;padding:12px;border-radius:6px;border:1px solid #3a3a3a;display:flex;flex-direction:column;gap:8px}button{background:#4CAF50;color:#fff;border:none;padding:10px;border-radius:4px;cursor:pointer;font-weight:bold;transition:.2s}button:hover{background:#45a049}button.btn-danger{background:#e53935}button.btn-danger:hover{background:#d32f2f}#main-content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;padding:20px;position:relative}#canvas-container{position:relative;border:2px solid #333;border-radius:8px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.8)}canvas{display:block;background:#000}.controls{margin-top:15px;display:flex;gap:15px;flex-wrap:wrap;justify-content:center}.hint{font-size:11px;color:#888;line-height:1.4}
+</style>
 </head>
 <body>
-  <div id="sidebar">
-    <h2>Settings</h2>
-    <div class="card">
-      <h3>Main Character</h3>
-      <div class="form-group"><label>Name</label><input type="text" id="main-name" value="Cristiano Ronaldo"></div>
-      <div class="form-group"><label>Height (m)</label><input type="number" step="0.01" id="main-height" value="1.87"></div>
-      <div class="form-group"><label>Details / Country</label><input type="text" id="main-details" value="Portugal"></div>
-      <div class="form-group"><label>Upload Frames (Walk Loop)</label><input type="file" id="main-frames" multiple accept="image/*"></div>
-    </div>
-    <h3>Other Characters</h3>
-    <div id="other-characters-container"></div>
-    <button type="button" id="add-character-btn">+ Add Other Character</button>
-    <div class="card">
-      <h3>Animation & Export</h3>
-      <div class="form-group"><label>Walk Speed (px/frame)</label><input type="number" id="walk-speed" value="3.5" step="0.5"></div>
-      <div class="form-group"><label>Frame Rate Speed (FPS)</label><input type="number" id="anim-fps" value="12"></div>
-    </div>
-  </div>
-  <div id="main-content">
-    <div id="canvas-container"><canvas id="stage" width="1280" height="720"></canvas></div>
-    <div class="controls">
-      <button id="play-btn">Play Animation</button>
-      <button id="export-btn" style="background:#008CBA;">Export HD MP4 Video</button>
-    </div>
-  </div>
-  <script>
-    const canvas = document.getElementById('stage');
-    const ctx = canvas.getContext('2d');
-    const GROUND_Y = 580;
-    const BASE_HEIGHT_PX = 380;
-    let mainCharacter = { name: '', height: 1.87, details: '', frames: [], currentFrameIndex: 0 };
-    let otherCharacters = [];
-    let isPlaying = false;
-    let animFrameId = null;
-    let walkerX = canvas.width + 100;
-    let currentWalkerIndex = 0;
-    let frameTimer = 0;
-
-    function loadImages(files) {
-      return Promise.all(Array.from(files).map(file => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      })));
-    }
-
-    function addOtherCharacterCard(data = {}) {
-      const container = document.getElementById('other-characters-container');
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.style.marginBottom = '10px';
-      const index = otherCharacters.length;
-      const charObj = {
-        name: data.name || `Player ${index + 1}`,
-        height: data.height || 1.65,
-        details: data.details || 'Country',
-        frames: [],
-        currentFrameIndex: 0
-      };
-      otherCharacters.push(charObj);
-      card.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h4>Character #${index + 1}</h4>
-          <button class="btn-danger" style="padding:2px 8px; font-size:12px;" onclick="removeCharacter(${index}, this)">X</button>
-        </div>
-        <div class="form-group"><label>Name</label><input type="text" value="${charObj.name}" onchange="otherCharacters[${index}].name = this.value"></div>
-        <div class="form-group"><label>Height (m)</label><input type="number" step="0.01" value="${charObj.height}" onchange="otherCharacters[${index}].height = parseFloat(this.value)"></div>
-        <div class="form-group"><label>Details</label><input type="text" value="${charObj.details}" onchange="otherCharacters[${index}].details = this.value"></div>
-        <div class="form-group"><label>Upload Frames</label><input type="file" multiple accept="image/*" onchange="loadOtherFrames(event, ${index})"></div>
-      `;
-      container.appendChild(card);
-    }
-
-    function removeCharacter(index, element) {
-      otherCharacters.splice(index, 1);
-      element.closest('.card').remove();
-    }
-
-    async function loadOtherFrames(event, index) {
-      const files = event.target.files;
-      if (files.length > 0) otherCharacters[index].frames = await loadImages(files);
-    }
-
-    document.getElementById('add-character-btn').addEventListener('click', () => addOtherCharacterCard());
-    document.getElementById('main-frames').addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) mainCharacter.frames = await loadImages(e.target.files);
-    });
-
-    function drawOverlay(x, y, name, height, details) {
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(x - 100, y - 90, 200, 70);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText(name, x, y - 68);
-      ctx.fillStyle = '#FFD700';
-      ctx.font = '14px sans-serif';
-      ctx.fillText(`${height} m`, x, y - 48);
-      ctx.fillStyle = '#CCCCCC';
-      ctx.font = '12px sans-serif';
-      ctx.fillText(details, x, y - 30);
-      ctx.restore();
-    }
-
-    function drawBackground() {
-      let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, '#1a1c23');
-      gradient.addColorStop(0.7, '#2c3e50');
-      gradient.addColorStop(1, '#111');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#222';
-      ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
-      ctx.strokeStyle = '#444';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, GROUND_Y);
-      ctx.lineTo(canvas.width, GROUND_Y);
-      ctx.stroke();
-    }
-
-    function animate() {
-      drawBackground();
-      mainCharacter.name = document.getElementById('main-name').value;
-      mainCharacter.height = parseFloat(document.getElementById('main-height').value) || 1.87;
-      mainCharacter.details = document.getElementById('main-details').value;
-      const speed = parseFloat(document.getElementById('walk-speed').value) || 3.5;
-      const fps = parseInt(document.getElementById('anim-fps').value) || 12;
-      frameTimer++;
-      const mainX = 350;
-      const mainScaledHeight = (mainCharacter.height / 2.0) * BASE_HEIGHT_PX;
-      const mainY = GROUND_Y - mainScaledHeight;
-      if (mainCharacter.frames.length > 0) {
-        if (frameTimer % Math.max(1, Math.floor(60 / fps)) === 0) mainCharacter.currentFrameIndex = (mainCharacter.currentFrameIndex + 1) % mainCharacter.frames.length;
-        const img = mainCharacter.frames[mainCharacter.currentFrameIndex];
-        const aspectRatio = img.width / img.height;
-        ctx.drawImage(img, mainX - (mainScaledHeight * aspectRatio) / 2, mainY, mainScaledHeight * aspectRatio, mainScaledHeight);
-      }
-      drawOverlay(mainX, mainY, mainCharacter.name, mainCharacter.height, mainCharacter.details);
-      if (otherCharacters.length > 0 && currentWalkerIndex < otherCharacters.length) {
-        const walker = otherCharacters[currentWalkerIndex];
-        const walkerScaledHeight = (walker.height / 2.0) * BASE_HEIGHT_PX;
-        const walkerY = GROUND_Y - walkerScaledHeight;
-        if (walker.frames.length > 0) {
-          if (frameTimer % Math.max(1, Math.floor(60 / fps)) === 0) walker.currentFrameIndex = (walker.currentFrameIndex + 1) % walker.frames.length;
-          const img = walker.frames[walker.currentFrameIndex];
-          const aspectRatio = img.width / img.height;
-          ctx.drawImage(img, walkerX - (walkerScaledHeight * aspectRatio) / 2, walkerY, walkerScaledHeight * aspectRatio, walkerScaledHeight);
-        }
-        drawOverlay(walkerX, walkerY, walker.name, walker.height, walker.details);
-        walkerX -= speed;
-        if (walkerX < -150) {
-          walkerX = canvas.width + 100;
-          currentWalkerIndex = (currentWalkerIndex + 1) % otherCharacters.length;
-        }
-      }
-      if (isPlaying) animFrameId = requestAnimationFrame(animate);
-    }
-
-    document.getElementById('play-btn').addEventListener('click', () => {
-      isPlaying = !isPlaying;
-      document.getElementById('play-btn').innerText = isPlaying ? 'Pause Animation' : 'Play Animation';
-      if (isPlaying) animate();
-    });
-
-    document.getElementById('export-btn').addEventListener('click', () => {
-      const stream = canvas.captureStream(60);
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-      const chunks = [];
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'character_comparison.mp4';
-        a.click();
-      };
-      recorder.start();
-      setTimeout(() => recorder.stop(), 10000);
-    });
-
-    addOtherCharacterCard({ name: 'Diego Maradona', height: 1.65, details: 'Argentina' });
-    drawBackground();
-  </script>
+<div id="sidebar">
+<h2>Settings</h2>
+<div class="card"><h3>Main Character</h3>
+<div class="form-group"><label>Name</label><input type="text" id="main-name" value="Cristiano Ronaldo"></div>
+<div class="form-group"><label>Height (m)</label><input type="number" step="0.01" id="main-height" value="1.87"></div>
+<div class="form-group"><label>Details / Country</label><input type="text" id="main-details" value="Portugal"></div>
+<div class="form-group"><label>Upload Frames (Walk Loop)</label><input type="file" id="main-frames" multiple accept="image/*"></div>
+</div>
+<h3>Other Characters</h3><div id="other-characters-container"></div><button type="button" id="add-character-btn">+ Add Other Character</button>
+<div class="card"><h3>Background</h3>
+<div class="form-group"><label>Background Image</label><input type="file" id="background-image" accept="image/*"></div>
+<button type="button" id="remove-background-btn" style="background:#555">Remove Background Image</button>
+<div class="hint">Upload any image. It will fill the 1280×720 stage while characters and overlays remain on top.</div>
+</div>
+<div class="card"><h3>Animation & Export</h3>
+<div class="form-group"><label>Walk Speed (px/frame)</label><input type="number" id="walk-speed" value="3.5" step="0.5"></div>
+<div class="form-group"><label>Frame Rate Speed (FPS)</label><input type="number" id="anim-fps" value="12"></div>
+</div>
+</div>
+<div id="main-content"><div id="canvas-container"><canvas id="stage" width="1280" height="720"></canvas></div><div class="controls"><button id="play-btn">Play Animation</button><button id="export-btn" style="background:#008CBA;">Export HD MP4 Video</button></div></div>
+<script>
+const canvas=document.getElementById('stage'),ctx=canvas.getContext('2d');
+const GROUND_Y=580,BASE_HEIGHT_PX=380;
+let mainCharacter={name:'',height:1.87,details:'',frames:[],currentFrameIndex:0};
+let otherCharacters=[],isPlaying=false,animFrameId=null,walkerX=canvas.width+100,currentWalkerIndex=0,frameTimer=0;
+let backgroundImage=null;
+function loadImages(files){return Promise.all(Array.from(files).map(file=>new Promise(resolve=>{const reader=new FileReader();reader.onload=e=>{const img=new Image();img.onload=()=>resolve(img);img.src=e.target.result};reader.readAsDataURL(file)})))}
+function loadBackground(file){if(!file){backgroundImage=null;drawBackground();return}const reader=new FileReader();reader.onload=e=>{const img=new Image();img.onload=()=>{backgroundImage=img;drawBackground();if(!isPlaying)renderFrame()};img.src=e.target.result};reader.readAsDataURL(file)}
+function addOtherCharacterCard(data={}){const container=document.getElementById('other-characters-container'),card=document.createElement('div');card.className='card';card.style.marginBottom='10px';const index=otherCharacters.length;const charObj={name:data.name||`Player ${index+1}`,height:data.height||1.65,details:data.details||'Country',frames:[],currentFrameIndex:0};otherCharacters.push(charObj);card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h4>Character #${index+1}</h4><button class="btn-danger" style="padding:2px 8px;font-size:12px" onclick="removeCharacter(${index},this)">X</button></div><div class="form-group"><label>Name</label><input type="text" value="${charObj.name}" onchange="otherCharacters[${index}].name=this.value"></div><div class="form-group"><label>Height (m)</label><input type="number" step="0.01" value="${charObj.height}" onchange="otherCharacters[${index}].height=parseFloat(this.value)"></div><div class="form-group"><label>Details</label><input type="text" value="${charObj.details}" onchange="otherCharacters[${index}].details=this.value"></div><div class="form-group"><label>Upload Frames</label><input type="file" multiple accept="image/*" onchange="loadOtherFrames(event,${index})"></div>`;container.appendChild(card)}
+function removeCharacter(index,element){otherCharacters.splice(index,1);element.closest('.card').remove();if(currentWalkerIndex>=otherCharacters.length)currentWalkerIndex=0;walkerX=canvas.width+100}
+async function loadOtherFrames(event,index){const files=event.target.files;if(files.length>0)otherCharacters[index].frames=await loadImages(files)}
+document.getElementById('add-character-btn').addEventListener('click',()=>addOtherCharacterCard());
+document.getElementById('main-frames').addEventListener('change',async e=>{if(e.target.files.length>0)mainCharacter.frames=await loadImages(e.target.files)});
+document.getElementById('background-image').addEventListener('change',e=>loadBackground(e.target.files[0]));
+document.getElementById('remove-background-btn').addEventListener('click',()=>{backgroundImage=null;document.getElementById('background-image').value='';renderFrame()});
+function drawOverlay(x,y,name,height,details){ctx.save();ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(x-100,y-90,200,70);ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';ctx.fillText(name,x,y-68);ctx.fillStyle='#FFD700';ctx.font='14px sans-serif';ctx.fillText(`${height} m`,x,y-48);ctx.fillStyle='#CCC';ctx.font='12px sans-serif';ctx.fillText(details,x,y-30);ctx.restore()}
+function drawBackground(){if(backgroundImage){const scale=Math.max(canvas.width/backgroundImage.width,canvas.height/backgroundImage.height),w=backgroundImage.width*scale,h=backgroundImage.height*scale;ctx.drawImage(backgroundImage,(canvas.width-w)/2,(canvas.height-h)/2,w,h)}else{const gradient=ctx.createLinearGradient(0,0,0,canvas.height);gradient.addColorStop(0,'#1a1c23');gradient.addColorStop(.7,'#2c3e50');gradient.addColorStop(1,'#111');ctx.fillStyle=gradient;ctx.fillRect(0,0,canvas.width,canvas.height)}ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(0,GROUND_Y,canvas.width,canvas.height-GROUND_Y);ctx.strokeStyle=backgroundImage?'rgba(255,255,255,.45)':'#444';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,GROUND_Y);ctx.lineTo(canvas.width,GROUND_Y);ctx.stroke()}
+function renderFrame(){drawBackground();mainCharacter.name=document.getElementById('main-name').value;mainCharacter.height=parseFloat(document.getElementById('main-height').value)||1.87;mainCharacter.details=document.getElementById('main-details').value;const mainX=350,mainScaledHeight=mainCharacter.height/2*BASE_HEIGHT_PX,mainY=GROUND_Y-mainScaledHeight;if(mainCharacter.frames.length){const img=mainCharacter.frames[mainCharacter.currentFrameIndex],ar=img.width/img.height;ctx.drawImage(img,mainX-mainScaledHeight*ar/2,mainY,mainScaledHeight*ar,mainScaledHeight)}drawOverlay(mainX,mainY,mainCharacter.name,mainCharacter.height,mainCharacter.details);if(otherCharacters.length&&currentWalkerIndex<otherCharacters.length){const walker=otherCharacters[currentWalkerIndex],walkerScaledHeight=walker.height/2*BASE_HEIGHT_PX,walkerY=GROUND_Y-walkerScaledHeight;if(walker.frames.length){const img=walker.frames[walker.currentFrameIndex],ar=img.width/img.height;ctx.drawImage(img,walkerX-walkerScaledHeight*ar/2,walkerY,walkerScaledHeight*ar,walkerScaledHeight)}drawOverlay(walkerX,walkerY,walker.name,walker.height,walker.details)}}
+function animate(){const speed=parseFloat(document.getElementById('walk-speed').value)||3.5,fps=parseInt(document.getElementById('anim-fps').value)||12;frameTimer++;if(frameTimer%Math.max(1,Math.floor(60/fps))===0){if(mainCharacter.frames.length)mainCharacter.currentFrameIndex=(mainCharacter.currentFrameIndex+1)%mainCharacter.frames.length;if(otherCharacters.length&&currentWalkerIndex<otherCharacters.length&&otherCharacters[currentWalkerIndex].frames.length)otherCharacters[currentWalkerIndex].currentFrameIndex=(otherCharacters[currentWalkerIndex].currentFrameIndex+1)%otherCharacters[currentWalkerIndex].frames.length}renderFrame();if(otherCharacters.length){walkerX-=speed;if(walkerX<-150){walkerX=canvas.width+100;currentWalkerIndex=(currentWalkerIndex+1)%otherCharacters.length}}if(isPlaying)animFrameId=requestAnimationFrame(animate)}
+document.getElementById('play-btn').addEventListener('click',()=>{isPlaying=!isPlaying;document.getElementById('play-btn').innerText=isPlaying?'Pause Animation':'Play Animation';if(isPlaying){frameTimer=0;animate()}else if(animFrameId)cancelAnimationFrame(animFrameId)});
+document.getElementById('export-btn').addEventListener('click',()=>{const stream=canvas.captureStream(60),recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9'}),chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=()=>{const blob=new Blob(chunks,{type:'video/mp4'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='character_comparison.mp4';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};if(!isPlaying){isPlaying=true;document.getElementById('play-btn').innerText='Pause Animation';animate()}recorder.start();setTimeout(()=>{recorder.stop();isPlaying=false;document.getElementById('play-btn').innerText='Play Animation';if(animFrameId)cancelAnimationFrame(animFrameId)},10000)});
+addOtherCharacterCard({name:'Diego Maradona',height:1.65,details:'Argentina'});renderFrame();
+</script>
 </body>
 </html>
