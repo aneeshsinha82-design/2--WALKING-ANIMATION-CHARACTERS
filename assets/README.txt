@@ -1,0 +1,1 @@
+Lamine Yamal 12-frame walking sprite asset. The main animation loads the sprite sheet and extracts all 12 transparent frames at runtime.
